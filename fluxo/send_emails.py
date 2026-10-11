@@ -9,18 +9,11 @@ from . import config, db, templates
 def _send_resend(to, subject, text):
     payload = json.dumps({
         "from": f"{config.FROM_NAME} <{config.FROM_EMAIL}>",
-        "to": [to],
-        "subject": subject,
-        "text": text,
+        "to": [to], "subject": subject, "text": text,
     }).encode()
     req = urllib.request.Request(
-        "https://api.resend.com/emails",
-        data=payload,
-        headers={
-            "Authorization": f"Bearer {config.RESEND_API_KEY}",
-            "Content-Type": "application/json",
-        },
-    )
+        "https://api.resend.com/emails", data=payload,
+        headers={"Authorization": f"Bearer {config.RESEND_API_KEY}", "Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=20) as r:
         return json.loads(r.read()).get("id")
 
@@ -29,31 +22,19 @@ def run(limit=None):
     limit = limit or config.DAILY_EMAIL_LIMIT
     if not config.DRY_RUN and (not config.RESEND_API_KEY or not config.FROM_EMAIL):
         sys.exit("Envio real exige RESEND_API_KEY e FLUXO_FROM_EMAIL. Use FLUXO_DRY_RUN=1 para testar.")
-
+    store = db.get_store()
+    unsub = store.unsubscribed()
+    targets = [c for c in store.candidates() if c["email"] not in unsub]
+    targets.sort(key=lambda c: c.get("rating_count") or 0, reverse=True)
     sent = 0
-    with db.connect() as c:
-        rows = c.execute(
-            """SELECT * FROM contacts
-               WHERE status = 'novo' AND email IS NOT NULL AND email != ''
-                 AND email NOT IN (SELECT email FROM unsubscribes)
-               ORDER BY rating_count DESC LIMIT ?""",
-            (limit,),
-        ).fetchall()
-        for contact in rows:
-            subject, text = templates.render(contact)
-            provider_id = None
-            if not config.DRY_RUN:
-                provider_id = _send_resend(contact["email"], subject, text)
-            c.execute(
-                "INSERT INTO sends (contact_id, channel, subject, dry_run, provider_id) VALUES (?,?,?,?,?)",
-                (contact["id"], "email", subject, int(config.DRY_RUN), provider_id),
-            )
-            if not config.DRY_RUN:
-                c.execute(
-                    "UPDATE contacts SET status='contatado', updated_at=datetime('now') WHERE id=?",
-                    (contact["id"],),
-                )
-            sent += 1
+    for contact in targets[:limit]:
+        subject, text = templates.render(contact)
+        provider_id = None
+        if not config.DRY_RUN:
+            provider_id = _send_resend(contact["email"], subject, text)
+            store.mark_status(contact["id"], "contatado")
+        store.record_send(contact["id"], subject, config.DRY_RUN, provider_id)
+        sent += 1
     return sent
 
 

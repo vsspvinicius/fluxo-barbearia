@@ -4,20 +4,30 @@ import tempfile
 import unittest
 
 os.environ["FLUXO_DRY_RUN"] = "1"
-os.environ["FLUXO_DB"] = os.path.join(tempfile.mkdtemp(), "test.db")
 
 from fluxo import classify_reply, config, db, import_prospects, report, send_emails  # noqa: E402
 
 
 class FluxoTests(unittest.TestCase):
     def setUp(self):
-        config.DB_PATH = os.path.join(tempfile.mkdtemp(), "t.db")  # banco novo por teste
+        # Testes sempre usam SQLite local, mesmo que o ambiente tenha Supabase configurado.
+        config.SUPABASE_URL = ""
+        config.SUPABASE_SERVICE_KEY = ""
+        config.DRY_RUN = True
+        config.DB_PATH = os.path.join(tempfile.mkdtemp(), "t.db")
         self.csv_path = os.path.join(tempfile.mkdtemp(), "p.csv")
         with open(self.csv_path, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f)
             w.writerow(["nome", "endereco", "telefone", "nota", "avaliacoes", "place_id"])
             w.writerow(["Barbearia A", "Rua 1", "+5519", "4.9", "100", "id1"])
             w.writerow(["Barbearia B", "Rua 2", "+5519", "5.0", "50", "id2"])
+
+    def _seed_with_emails(self):
+        import_prospects.import_csv(self.csv_path)
+        store = db.get_store()
+        store.set_email("id1", "a@x.com")
+        store.set_email("id2", "b@x.com")
+        return store
 
     def test_import_is_idempotent(self):
         self.assertEqual(import_prospects.import_csv(self.csv_path), 2)
@@ -30,24 +40,23 @@ class FluxoTests(unittest.TestCase):
         self.assertEqual(classify_reply.classify_rules("Não tenho interesse, obrigado"), "recusou")
 
     def test_dry_run_sends_nothing_and_respects_limit(self):
-        import_prospects.import_csv(self.csv_path)
-        with db.connect() as c:
-            c.execute("UPDATE contacts SET email='a@x.com' WHERE place_id='id1'")
-            c.execute("UPDATE contacts SET email='b@x.com' WHERE place_id='id2'")
+        store = self._seed_with_emails()
         self.assertEqual(send_emails.run(limit=1), 1)
-        with db.connect() as c:
-            self.assertEqual(c.execute("SELECT COUNT(*) FROM sends WHERE dry_run=0").fetchone()[0], 0)
-            self.assertEqual(c.execute("SELECT status FROM contacts WHERE place_id='id1'").fetchone()[0], "novo")
+        self.assertEqual(store.count("sends", where={"dry_run": False}), 0)
+        self.assertEqual(store.count("sends", where={"dry_run": True}), 1)
+        self.assertEqual(store.count("contacts", where={"status": "novo"}), 2)
 
     def test_unsubscribed_is_skipped(self):
-        import_prospects.import_csv(self.csv_path)
-        with db.connect() as c:
-            c.execute("UPDATE contacts SET email='a@x.com' WHERE place_id='id1'")
-            c.execute("INSERT INTO unsubscribes (email) VALUES ('a@x.com')")
-        self.assertEqual(send_emails.run(limit=10), 0)
+        store = self._seed_with_emails()
+        store.add_unsubscribe("a@x.com")
+        self.assertEqual(send_emails.run(limit=10), 1)
 
-    def test_report_renders(self):
-        self.assertIn("Relatório Fluxo Barbearia", report.build())
+    def test_report_renders_with_counts(self):
+        self._seed_with_emails()
+        text = report.build()
+        self.assertIn("Relatório Fluxo Barbearia", text)
+        self.assertIn("Contatos na lista: 2", text)
+        self.assertIn("Com e-mail: 2", text)
 
 
 if __name__ == "__main__":

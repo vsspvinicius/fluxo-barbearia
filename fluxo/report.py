@@ -1,22 +1,21 @@
 """Relatório diário: processo primeiro, financeiro depois."""
 from . import db
 
-QUERIES = [
-    ("Contatos na lista", "SELECT COUNT(*) FROM contacts"),
-    ("Com e-mail", "SELECT COUNT(*) FROM contacts WHERE email IS NOT NULL AND email != ''"),
-    ("E-mails enviados (reais)", "SELECT COUNT(*) FROM sends WHERE dry_run = 0"),
-    ("Simulações (dry-run)", "SELECT COUNT(*) FROM sends WHERE dry_run = 1"),
-    ("Respostas recebidas", "SELECT COUNT(*) FROM replies"),
-    ("Interessados", "SELECT COUNT(*) FROM replies WHERE classification = 'interessado'"),
-    ("Descadastros", "SELECT COUNT(*) FROM unsubscribes"),
+LINES = [
+    ("Contatos na lista", lambda s: s.count("contacts")),
+    ("Com e-mail", lambda s: s.count("contacts", not_null=["email"])),
+    ("E-mails enviados (reais)", lambda s: s.count("sends", where={"dry_run": False})),
+    ("Simulações (dry-run)", lambda s: s.count("sends", where={"dry_run": True})),
+    ("Respostas recebidas", lambda s: s.count("replies")),
+    ("Interessados", lambda s: s.count("replies", where={"classification": "interessado"})),
+    ("Descadastros", lambda s: s.count("unsubscribes")),
 ]
 
 
 def build():
+    store = db.get_store()
     lines = ["# Relatório Fluxo Barbearia", ""]
-    with db.connect() as c:
-        for label, sql in QUERIES:
-            lines.append(f"{label}: {c.execute(sql).fetchone()[0]}")
+    lines += [f"{label}: {fn(store)}" for label, fn in LINES]
     lines += ["", "Financeiro: R$ 0,00 (nenhuma venda registrada)"]
     return "\n".join(lines)
 
