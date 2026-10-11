@@ -46,6 +46,26 @@ class FluxoTests(unittest.TestCase):
         self.assertEqual(store.count("sends", where={"dry_run": True}), 1)
         self.assertEqual(store.count("contacts", where={"status": "novo"}), 2)
 
+    def test_gmail_used_when_app_password_set(self):
+        from unittest import mock
+        store = self._seed_with_emails()
+        config.DRY_RUN = False
+        config.FROM_EMAIL = "eu@gmail.com"
+        config.GMAIL_APP_PASSWORD = "abcdabcdabcdabcd"
+        try:
+            with mock.patch("smtplib.SMTP_SSL") as smtp:
+                self.assertEqual(send_emails.run(limit=1), 1)
+                server = smtp.return_value.__enter__.return_value
+                server.login.assert_called_once_with("eu@gmail.com", "abcdabcdabcdabcd")
+                msg = server.send_message.call_args[0][0]
+                self.assertIn("remover", msg["List-Unsubscribe"])
+            self.assertEqual(store.count("sends", where={"dry_run": False}), 1)
+            self.assertEqual(store.count("contacts", where={"status": "contatado"}), 1)
+        finally:
+            config.DRY_RUN = True
+            config.FROM_EMAIL = ""
+            config.GMAIL_APP_PASSWORD = ""
+
     def test_unsubscribed_is_skipped(self):
         store = self._seed_with_emails()
         store.add_unsubscribe("a@x.com")
