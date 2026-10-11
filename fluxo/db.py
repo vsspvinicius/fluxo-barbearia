@@ -99,8 +99,10 @@ class SupabaseStore:
 
     def _req(self, method, table, params=None, body=None, prefer=None):
         qs = ("?" + urllib.parse.urlencode(params, safe=".,()")) if params else ""
-        headers = {"apikey": self.key, "Authorization": f"Bearer {self.key}",
-                   "Content-Type": "application/json"}
+        headers = {"apikey": self.key, "Content-Type": "application/json"}
+        # Chaves JWT (legado, "eyJ...") também vão no Authorization. Chaves novas ("sb_secret_...") só no apikey.
+        if self.key.startswith("eyJ"):
+            headers["Authorization"] = f"Bearer {self.key}"
         if prefer:
             headers["Prefer"] = prefer
         data = json.dumps(body).encode() if body is not None else None
