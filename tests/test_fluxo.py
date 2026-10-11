@@ -66,6 +66,17 @@ class FluxoTests(unittest.TestCase):
             config.FROM_EMAIL = ""
             config.GMAIL_APP_PASSWORD = ""
 
+    def test_template_personal_no_links_no_prices(self):
+        from fluxo import templates
+        subj, body = templates.render({"name": "Barbearia A", "rating": 4.9, "rating_count": 100})
+        self.assertIn("Barbearia A", subj)
+        self.assertIn("4,9 estrelas e 100 avaliações", body)
+        self.assertNotIn("http", body)
+        self.assertNotIn("R$", body)
+        self.assertIn("remover", body)
+        _, body2 = templates.render({"name": "Barbearia B", "rating": None, "rating_count": None})
+        self.assertNotIn("estrelas", body2)
+
     def test_unsubscribed_is_skipped(self):
         store = self._seed_with_emails()
         store.add_unsubscribe("a@x.com")
