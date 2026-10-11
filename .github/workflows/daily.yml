@@ -1,0 +1,31 @@
+name: fluxo-diario
+
+on:
+  schedule:
+    - cron: "0 12 * * *"   # 09:00 em São Paulo (UTC-3)
+  workflow_dispatch: {}
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    env:
+      FLUXO_DRY_RUN: ${{ vars.FLUXO_DRY_RUN || '1' }}
+      FLUXO_FROM_EMAIL: ${{ vars.FLUXO_FROM_EMAIL }}
+      FLUXO_UNSUBSCRIBE_URL: ${{ vars.FLUXO_UNSUBSCRIBE_URL }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Testes
+        run: python -m unittest discover -s tests -t . -v
+      - name: Envio do dia (dry-run por padrão)
+        run: python -m fluxo.send_emails
+      - name: Relatório
+        run: python -m fluxo.report | tee relatorio.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: relatorio-diario
+          path: relatorio.md
