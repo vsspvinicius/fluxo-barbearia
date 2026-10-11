@@ -6,7 +6,7 @@ DAILY_EMAIL_LIMIT = int(os.environ.get("FLUXO_DAILY_LIMIT", "20"))
 DRY_RUN = os.environ.get("FLUXO_DRY_RUN", "1") == "1"  # padrão: não envia nada
 
 FROM_EMAIL = os.environ.get("FLUXO_FROM_EMAIL", "")
-FROM_NAME = os.environ.get("FLUXO_FROM_NAME", "Fluxo Barbearia (provisório)")
+FROM_NAME = os.environ.get("FLUXO_FROM_NAME") or "Fluxo Barbearia (provisório)"
 COMPANY_ADDRESS = os.environ.get("FLUXO_COMPANY_ADDRESS", "[endereço a definir]")
 COMPANY_ID = os.environ.get("FLUXO_COMPANY_ID", "[CNPJ/MEI a definir]")
 UNSUBSCRIBE_URL = os.environ.get("FLUXO_UNSUBSCRIBE_URL", "")
@@ -19,5 +19,7 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+# Gmail: senha de app (16 letras) da conta em FLUXO_FROM_EMAIL. Se existir, o envio usa o Gmail.
+GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "").replace(" ", "")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 ANTHROPIC_MODEL = os.environ.get("FLUXO_MODEL", "claude-haiku-5-5")
