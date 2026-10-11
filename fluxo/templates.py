@@ -1,34 +1,42 @@
-"""Textos de e-mail. Sem nome de pessoa, sem promessa de resultado."""
+"""Texto do primeiro e-mail. Curto, pessoal, sem link e sem preço (ajuda a não cair no spam).
+O único pedido é uma resposta "sim"; preço e detalhes vêm na conversa."""
 from . import config
 
-SUBJECT = "Agendamento automático para {name}"
+SUBJECT = "pergunta rápida sobre a {name}"
 
-BODY_TEXT = """Olá, equipe da {name}.
+GOOGLE_LINE = "Vi que vocês têm {rating} estrelas e {count} avaliações no Google. Cliente satisfeito não falta por aí.\n\n"
 
-Vi a barbearia no Google e quis apresentar uma solução simples: uma automação que responde clientes no WhatsApp e Instagram fora do horário, agenda o horário, envia lembrete antes do atendimento e reduz faltas sem aviso.
+BODY_TEXT = """Oi, pessoal da {name}, tudo bem?
 
-Implantação em até 7 dias. Para as três primeiras barbearias de Campinas, o valor de implantação é R$ 500 (regular R$ 700), com mensalidade de R$ 250.
+{google_line}O que costuma escapar é outra coisa: a mensagem que chega às 22h pedindo horário e só é vista no dia seguinte. Até lá, o cliente já marcou em outro lugar. Junta isso com quem marca e não aparece, e no fim da semana são algumas cadeiras vazias.
 
-Mais detalhes e formulário: {landing}
+Eu monto um atendimento automático que responde no WhatsApp e no Instagram a qualquer hora, já marca o horário e manda um lembrete antes do corte. A rotina da barbearia continua igual.
 
-Se não quiser mais receber estes e-mails, responda com "remover" ou use o link abaixo.
-
-{unsubscribe}
+Faz sentido eu te mostrar como ficaria aí na {name}? Responde só com um "sim" que eu te explico em 2 minutos, por aqui mesmo.
 
 {from_name}
-{address}
-Identificação: {company_id}
+Fluxo Barbearia · Campinas
+
+Se não quiser receber outro e-mail, é só responder "remover".
 """
 
 
+def _google_line(contact):
+    rating, count = contact.get("rating"), contact.get("rating_count")
+    try:
+        rating, count = float(rating), int(count)
+    except (TypeError, ValueError):
+        return ""
+    if rating < 4.0 or count < 5:
+        return ""
+    stars = f"{rating:.1f}".replace(".", ",")
+    return GOOGLE_LINE.format(rating=stars, count=count)
+
+
 def render(contact):
-    unsub = config.UNSUBSCRIBE_URL or "Para descadastrar, responda este e-mail com a palavra REMOVER."
     body = BODY_TEXT.format(
         name=contact["name"],
-        landing=config.LANDING_URL,
-        unsubscribe=unsub,
+        google_line=_google_line(contact),
         from_name=config.FROM_NAME,
-        address=config.COMPANY_ADDRESS,
-        company_id=config.COMPANY_ID,
     )
     return SUBJECT.format(name=contact["name"]), body

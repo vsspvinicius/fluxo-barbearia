@@ -2,11 +2,11 @@
 import os
 
 DB_PATH = os.environ.get("FLUXO_DB", "fluxo.db")  # usado só se Supabase não estiver configurado
-DAILY_EMAIL_LIMIT = int(os.environ.get("FLUXO_DAILY_LIMIT", "20"))
+DAILY_EMAIL_LIMIT = int(os.environ.get("FLUXO_DAILY_LIMIT") or "5")  # começo lento: conta Gmail nova
 DRY_RUN = os.environ.get("FLUXO_DRY_RUN", "1") == "1"  # padrão: não envia nada
 
 FROM_EMAIL = os.environ.get("FLUXO_FROM_EMAIL", "")
-FROM_NAME = os.environ.get("FLUXO_FROM_NAME") or "Fluxo Barbearia (provisório)"
+FROM_NAME = os.environ.get("FLUXO_FROM_NAME") or "Vinícius"
 COMPANY_ADDRESS = os.environ.get("FLUXO_COMPANY_ADDRESS", "[endereço a definir]")
 COMPANY_ID = os.environ.get("FLUXO_COMPANY_ID", "[CNPJ/MEI a definir]")
 UNSUBSCRIBE_URL = os.environ.get("FLUXO_UNSUBSCRIBE_URL", "")
